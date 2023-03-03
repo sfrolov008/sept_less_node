@@ -1,52 +1,89 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const fsService = require('./fs.service')
 
-// fs.appendFile(path.join('users.json'),JSON.stringify({name:'anja', age: 21, gender: 'female'}),(err)=>{
-//     console.log(err);
-// })
-
-const users = require('./users.json')
 
 const app = express();
-const PORT = 5000;
+
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
 
-app.get('/users', (req, res) => {
-    res.status(200).json(users)
+app.get('/users', async (req, res) => {
+    const users = await fsService.reader()
+    res.json(users)
 })
 
-app.get('/users/:userId', (req, res) => {
+app.post('/users', async (req, res) => {
+    const {name, age, gender} = req.body;
+
+    if (!name || name.length < 2) {
+        res.status(400).json('wrong name')
+    }
+    if (!age || age < 0 || !Number.isInteger(age) || Number.isNaN(age)) {
+        res.status(400).json('wrong age')
+    }
+    if (!gender || (gender !== 'male' && gender !== 'female')) {
+        res.status(400).json('wrong gender')
+    }
+
+    const users = await fsService.reader()
+    const newUser = {
+        id: users[users.length - 1]?.id + 1 || 1,
+        name,
+        age,
+        gender
+    }
+    users.push(newUser)
+    await fsService.writer(users)
+
+    res.status(201).json(newUser)
+});
+
+app.get('/users/:userId', async (req, res) => {
     const {userId} = req.params;
-    const user = users[+userId];
-    res.json(user);
+    const users = await fsService.reader()
+    const user = users.find(user => user.id === +userId)
+
+    if (!user) {
+        res.status(422).json('user not found')
+    }
+    res.status(200).json(user)
 })
 
-app.post('/users', (req, res) => {
-    const body = req.body;
-    console.log(JSON.stringify(body));
-    // fs.appendFile(path.join('users.json', body, (err)=>{
-    //     if (err){
-    //         console.log(err);
-    //     }
-    // }))
+app.patch('/users/:userId', async (req, res) => {
+    const {userId} = req.params;
+    const {name, age, gender} = req.body;
+
+    if (name && name.length < 2) {
+        res.status(400).json('wrong name')
+    }
+    if (age && age < 0 || !Number.isInteger(age) || Number.isNaN(age)) {
+        res.status(400).json('wrong age')
+    }
+    if (gender && (gender !== 'male' && gender !== 'female')) {
+        res.status(400).json('wrong gender')
+    }
+
+    const users = await fsService.reader()
+    const index = users.findIndex((user) => user.id === +userId)
+
+    users[index] = {...users[index], ...req.body}
+
+    await fsService.writer(users);
+    res.status(201).json('newUser')
+});
+
+app.delete('/users/:userId', async (req, res)=>{
+    const {userId} = req.params
+    const users = await fsService.reader()
+    const index = users.findIndex((user) => user.id === +userId)
+
+    users.splice(index, 1)
+    await fsService.writer(users)
+
+    res.sendStatus(204);
 })
 
-app.put('users/:userId', (req, res) => {
-    const {userID} = req.params;
-    const updatedUser = req.body;
-    users[userID] = updatedUser;
-    res.status(200).json({message:'user updated', data: users[+userID]})
-})
-
-app.delete('users/:userId', (req, res)=>{
-    const {userID} = req.params;
-    users.splice(+userID, 1)
-    res.status(200).json({message:'user deleted'})
-})
-
+const PORT = 5000;
 app.listen(PORT, () => {
     console.log(`Server started on PORT ${PORT}`)
-
 });
