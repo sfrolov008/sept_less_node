@@ -10,5 +10,6 @@
 /sept_less_node.iml
 # Project exclude paths
 /node_modules/
+/dist/
 #Environment variables
-.env
+/.env
