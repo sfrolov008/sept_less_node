@@ -1,31 +1,34 @@
 import { Router } from "express";
 
-import { userController } from "../controllers/user.controller";
-import { userMiddleWare } from "../middlewares/user.middleware";
+import { userController } from "../controllers";
+import { authMiddleWare, userMiddleWare } from "../middlewares";
 
 const router = Router();
 
 router.get("/", userController.getAll);
-router.post("/", userMiddleWare.isUserValidCreate, userController.create);
+router.post("/", userMiddleWare.isValidCreate, userController.create);
 
 router.get(
   "/:userId",
-  userMiddleWare.isUserValid,
+  authMiddleWare.checkAccessToken,
+  userMiddleWare.isValid,
   userMiddleWare.getByIdAndThrow,
   userController.getById
 );
 
 router.patch(
   "/:userId",
-  userMiddleWare.isUserValid,
-  userMiddleWare.isUserValidUpdate,
+  authMiddleWare.checkAccessToken,
+  userMiddleWare.isValid,
+  userMiddleWare.isValidUpdate,
   userMiddleWare.getByIdAndThrow,
   userController.update
 );
 
 router.delete(
   "/:userId",
-  userMiddleWare.isUserValid,
+  authMiddleWare.checkAccessToken,
+  userMiddleWare.isValid,
   userMiddleWare.getByIdAndThrow,
   userController.delete
 );
