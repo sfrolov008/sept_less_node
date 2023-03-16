@@ -1,7 +1,7 @@
 import { sign, verify } from "jsonwebtoken";
 
 import { configs } from "../configs";
-import { ETokenType } from "../enum";
+import { ETokenType } from "../enums";
 import { ApiError } from "../errors";
 import { ITokenPair, ITokenPayload } from "../types";
 

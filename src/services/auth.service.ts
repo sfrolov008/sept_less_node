@@ -1,9 +1,10 @@
+import { EEmailActions, ESmsActions } from "../enums";
 import { ApiError } from "../errors";
-import { Token } from "../models";
-import { User } from "../models";
+import { Token, User } from "../models";
 import { ICredentials, ITokenPair, ITokenPayload, IUser } from "../types";
 import { emailService } from "./email.service";
 import { passwordService } from "./password.service";
+import { smsService } from "./sms.service";
 import { tokenService } from "./token.service";
 
 export class AuthService {
@@ -15,8 +16,13 @@ export class AuthService {
         ...body,
         password: hashedPassword,
       });
-
-      await emailService.sendMail("sfrolov008@gmail.com");
+      Promise.all([
+        await smsService.sendSms("+380666179332", ESmsActions.WELCOME),
+        await emailService.sendMail(
+          "sfrolov008@gmail.com",
+          EEmailActions.WELCOME
+        ),
+      ]);
     } catch (e) {
       throw new ApiError(e.message, e.status);
     }
@@ -70,6 +76,26 @@ export class AuthService {
     } catch (e) {
       throw new ApiError(e.message, e.status);
     }
+  }
+
+  public async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    const user = await User.findById(userId);
+
+    const isMatched = await passwordService.comparePasswords(
+      oldPassword,
+      user.password
+    );
+
+    if (!isMatched) {
+      throw new ApiError("Wrong old password", 400);
+    }
+
+    const hashedNewPassword = await passwordService.hashPassword(newPassword);
+    await User.updateOne({ _id: user._id }, { password: hashedNewPassword });
   }
 }
 export const authService = new AuthService();
