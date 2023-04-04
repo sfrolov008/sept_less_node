@@ -1,10 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 
 import { ETokenType } from "../enums";
-import { EActionTokenType } from "../enums/action-token-type";
+import { EActionTokenType } from "../enums";
 import { ApiError } from "../errors";
 import { Action, Token } from "../models";
-import { tokenService } from "../services";
+import { OldPassword } from "../models";
+import { passwordService, tokenService } from "../services";
 
 class AuthMiddleware {
   public async checkAccessToken(
@@ -61,30 +62,58 @@ class AuthMiddleware {
       next(e);
     }
   }
-  public async checkActionForgotToken(
+
+  public checkActionToken(type: EActionTokenType) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const actionToken = req.params.token;
+
+        if (!actionToken) {
+          throw new ApiError("No token", 401);
+        }
+
+        const jwtPayload = tokenService.checkActionToken(actionToken, type);
+
+        const tokenInfo = await Action.findOne({ actionToken });
+
+        if (!tokenInfo) {
+          throw new ApiError("Invalid token", 401);
+        }
+
+        req.res.locals = { tokenInfo, jwtPayload };
+        next();
+      } catch (e) {
+        next(e);
+      }
+    };
+  }
+
+  public async checkOldPassword(
     req: Request,
     res: Response,
     next: NextFunction
-  ): Promise<void> {
+  ) {
     try {
-      const actionToken = req.params.token;
+      const { body } = req;
+      const { tokenInfo } = req.res.locals;
 
-      if (!actionToken) {
-        throw new ApiError("No token", 401);
-      }
+      const oldPasswords = await OldPassword.find({
+        _user_id: tokenInfo._user_id,
+      });
 
-      const jwtPayload = tokenService.checkActionToken(
-        actionToken,
-        EActionTokenType.forgot
+      if (!oldPasswords) return next();
+
+      await Promise.all(
+        oldPasswords.map(async (record) => {
+          const isMatched = await passwordService.comparePasswords(
+            body.password,
+            record.password
+          );
+          if (isMatched) {
+            throw new ApiError("Password can't be use", 409);
+          }
+        })
       );
-
-      const tokenInfo = await Action.findOne({ actionToken });
-
-      if (!tokenInfo) {
-        throw new ApiError("Invalid token", 401);
-      }
-
-      req.res.locals = { tokenInfo, jwtPayload };
       next();
     } catch (e) {
       next(e);

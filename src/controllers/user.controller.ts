@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from "express";
+import { UploadedFile } from "express-fileupload";
 
-import { User } from "../models";
-import { userService } from "../services";
-import { IMessage } from "../types";
-import { ICommonResponse, IUser } from "../types";
+import { userMapper } from "../mapper";
+import { IQuery, userService } from "../services";
+import { IUser } from "../types";
 
 class UserController {
   public async getAll(
@@ -12,7 +12,9 @@ class UserController {
     next: NextFunction
   ): Promise<Response<IUser[]>> {
     try {
-      const users = await userService.getAll();
+      const users = await userService.getWithPagination(
+        req.query as unknown as IQuery
+      );
 
       return res.json(users);
     } catch (e) {
@@ -27,29 +29,30 @@ class UserController {
   ): Promise<Response<IUser>> {
     try {
       const { user } = res.locals;
-      return res.json(user);
+      const response = userMapper.toResponse(user);
+      return res.json(response);
     } catch (e) {
       next(e);
     }
   }
 
-  public async create(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<Response<ICommonResponse<IUser>>> {
-    try {
-      const body = req.body;
-      const user = await User.create(body);
-
-      return res.status(201).json({
-        message: "User created!",
-        data: user,
-      });
-    } catch (e) {
-      next(e);
-    }
-  }
+  // public async create(
+  //   req: Request,
+  //   res: Response,
+  //   next: NextFunction
+  // ): Promise<Response<ICommonResponse<IUser>>> {
+  //   try {
+  //     const body = req.body;
+  //     const user = await User.create(body);
+  //
+  //     return res.status(201).json({
+  //       message: "User created!",
+  //       data: user,
+  //     });
+  //   } catch (e) {
+  //     next(e);
+  //   }
+  // }
 
   public async update(
     req: Request,
@@ -57,15 +60,13 @@ class UserController {
     next: NextFunction
   ): Promise<Response<IUser>> {
     try {
-      const { userId } = req.params;
+      const { params, body } = req;
 
-      const updatedUser = await User.findByIdAndUpdate(
-        userId,
-        { ...req.body },
-        { new: true }
-      );
+      const updatedUser = await userService.update(params.userId, body);
 
-      return res.status(201).json(updatedUser);
+      const response = userMapper.toResponse(updatedUser);
+
+      return res.status(201).json(response);
     } catch (e) {
       next(e);
     }
@@ -75,14 +76,48 @@ class UserController {
     req: Request,
     res: Response,
     next: NextFunction
-  ): Promise<Response<IMessage>> {
+  ): Promise<Response<void>> {
     try {
       const { userId } = req.params;
-      await User.deleteOne({ _id: userId });
 
-      return res.status(200).json({
-        message: "User deleted",
-      });
+      await userService.delete(userId);
+
+      return res.sendStatus(204);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  public async uploadAvatar(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response<IUser>> {
+    try {
+      const userEntity = res.locals.user as IUser;
+      const avatar = req.files.avatar as UploadedFile;
+
+      const user = await userService.uploadAvatar(avatar, userEntity);
+
+      const response = userMapper.toResponse(user);
+
+      return res.status(201).json(response);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  public async deleteAvatar(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response<IUser>> {
+    try {
+      const userEntity = res.locals.user as IUser;
+      const user = await userService.deleteAvatar(userEntity);
+      const response = userMapper.toResponse(user);
+
+      return res.status(201).json(response);
     } catch (e) {
       next(e);
     }

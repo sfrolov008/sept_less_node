@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userController = void 0;
-const models_1 = require("../models");
+const mapper_1 = require("../mapper");
 const services_1 = require("../services");
 class UserController {
     async getAll(req, res, next) {
         try {
-            const users = await services_1.userService.getAll();
+            const users = await services_1.userService.getWithPagination(req.query);
             return res.json(users);
         }
         catch (e) {
@@ -16,20 +16,8 @@ class UserController {
     async getById(req, res, next) {
         try {
             const { user } = res.locals;
-            return res.json(user);
-        }
-        catch (e) {
-            next(e);
-        }
-    }
-    async create(req, res, next) {
-        try {
-            const body = req.body;
-            const user = await models_1.User.create(body);
-            return res.status(201).json({
-                message: "User created!",
-                data: user,
-            });
+            const response = mapper_1.userMapper.toResponse(user);
+            return res.json(response);
         }
         catch (e) {
             next(e);
@@ -37,9 +25,10 @@ class UserController {
     }
     async update(req, res, next) {
         try {
-            const { userId } = req.params;
-            const updatedUser = await models_1.User.findByIdAndUpdate(userId, { ...req.body }, { new: true });
-            return res.status(201).json(updatedUser);
+            const { params, body } = req;
+            const updatedUser = await services_1.userService.update(params.userId, body);
+            const response = mapper_1.userMapper.toResponse(updatedUser);
+            return res.status(201).json(response);
         }
         catch (e) {
             next(e);
@@ -48,10 +37,31 @@ class UserController {
     async delete(req, res, next) {
         try {
             const { userId } = req.params;
-            await models_1.User.deleteOne({ _id: userId });
-            return res.status(200).json({
-                message: "User deleted",
-            });
+            await services_1.userService.delete(userId);
+            return res.sendStatus(204);
+        }
+        catch (e) {
+            next(e);
+        }
+    }
+    async uploadAvatar(req, res, next) {
+        try {
+            const userEntity = res.locals.user;
+            const avatar = req.files.avatar;
+            const user = await services_1.userService.uploadAvatar(avatar, userEntity);
+            const response = mapper_1.userMapper.toResponse(user);
+            return res.status(201).json(response);
+        }
+        catch (e) {
+            next(e);
+        }
+    }
+    async deleteAvatar(req, res, next) {
+        try {
+            const userEntity = res.locals.user;
+            const user = await services_1.userService.deleteAvatar(userEntity);
+            const response = mapper_1.userMapper.toResponse(user);
+            return res.status(201).json(response);
         }
         catch (e) {
             next(e);

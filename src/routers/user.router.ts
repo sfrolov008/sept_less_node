@@ -6,6 +6,7 @@ import {
   commonMiddleware,
   userMiddleWare,
 } from "../middlewares";
+import { fileMiddleware } from "../middlewares/file.middleware";
 import { UserValidator } from "../validators";
 
 const router = Router();
@@ -20,7 +21,7 @@ router.get(
   userController.getById
 );
 
-router.patch(
+router.put(
   "/:userId",
   authMiddleWare.checkAccessToken,
   commonMiddleware.isIdValid("userId"),
@@ -35,5 +36,22 @@ router.delete(
   commonMiddleware.isIdValid("userId"),
   userMiddleWare.getByIdAndThrow,
   userController.delete
+);
+
+router.put(
+  "/:userId/avatar",
+  authMiddleWare.checkAccessToken,
+  commonMiddleware.isIdValid("userId"),
+  fileMiddleware.isAvatarValid,
+  userMiddleWare.getByIdAndThrow,
+  userController.uploadAvatar
+);
+
+router.delete(
+  "/:userId/avatar",
+  authMiddleWare.checkAccessToken,
+  commonMiddleware.isIdValid("userId"),
+  userMiddleWare.getByIdAndThrow,
+  userController.deleteAvatar
 );
 export const userRouter = router;

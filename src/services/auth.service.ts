@@ -1,11 +1,11 @@
-import { EEmailActions, ESmsActions } from "../enums";
-import { EActionTokenType } from "../enums/action-token-type";
+import { EEmailActions, EUserStatus } from "../enums";
+import { EActionTokenType } from "../enums";
 import { ApiError } from "../errors";
 import { Action, Token, User } from "../models";
+import { OldPassword } from "../models";
 import { ICredentials, ITokenPair, ITokenPayload, IUser } from "../types";
 import { emailService } from "./email.service";
 import { passwordService } from "./password.service";
-import { smsService } from "./sms.service";
 import { tokenService } from "./token.service";
 
 export class AuthService {
@@ -18,7 +18,7 @@ export class AuthService {
         password: hashedPassword,
       });
       Promise.all([
-        await smsService.sendSms("", ESmsActions.WELCOME),
+        // await smsService.sendSms("", ESmsActions.WELCOME),
         await emailService.sendMail(
           "sfrolov008@gmail.com",
           EEmailActions.WELCOME
@@ -113,15 +113,62 @@ export class AuthService {
       await emailService.sendMail(user.email, EEmailActions.FORGOT_PASSWORD, {
         token: actionToken,
       });
+
+      await OldPassword.create({ _user_id: user._id, password: user.password });
     } catch (e) {
       throw new ApiError(e.message, e.status);
     }
   }
-  public async setForgotPassword(password: string, id: string): Promise<void> {
+
+  public async setForgotPassword(
+    password: string,
+    id: string,
+    token: string
+  ): Promise<void> {
     try {
       const hashedPassword = await passwordService.hashPassword(password);
 
       await User.updateOne({ _id: id }, { password: hashedPassword });
+      await Action.deleteOne({
+        actionToken: token,
+        tokenType: EActionTokenType.forgot,
+      });
+    } catch (e) {
+      throw new ApiError(e.message, e.status);
+    }
+  }
+
+  public async sendActivateToken(user: IUser) {
+    try {
+      const actionToken = tokenService.generateActionToken(
+        { _id: user._id },
+        EActionTokenType.activate
+      );
+      await Action.create({
+        actionToken,
+        tokenType: EActionTokenType.activate,
+        _user_id: user._id,
+      });
+      await emailService.sendMail(user.email, EEmailActions.ACTIVATE, {
+        token: actionToken,
+      });
+    } catch (e) {
+      throw new ApiError(e.message, e.status);
+    }
+  }
+
+  public async activate(userId: string): Promise<void> {
+    try {
+      await Promise.all([
+        User.updateOne(
+          { _id: userId },
+          { $set: { status: EUserStatus.active } }
+        ),
+        await Token.deleteMany({
+          _user_id: userId,
+          tokenType: EActionTokenType.activate,
+        }),
+      ]);
     } catch (e) {
       throw new ApiError(e.message, e.status);
     }
